@@ -6,10 +6,10 @@ This isn't meant to be a polished, ready-to-use chat app. It's a way to actually
 
 ## Learning Phases
 
-- **Phase 1 — Sockets basics**: `TcpListener`, `TcpStream`, accepting a single connection, reading one line with `BufReader`.
-- **Phase 2 — Handling multiple clients (sequentially)**: looping `accept()` to handle clients one after another, understanding the OS-level backlog queue and why a single blocking loop can't serve two clients at once.
-- **Phase 3 — Concurrency with threads**: `std::thread::spawn` + `move` closures, giving each client its own thread so one client can't block another.
-- **Phase 4 — Shared state across threads**: `Arc<Mutex<T>>` to safely share a registry of connected clients across threads, enabling actual message broadcasting between clients.
+- **Phase 1 - Sockets basics**: `TcpListener`, `TcpStream`, accepting a single connection, reading one line with `BufReader`.
+- **Phase 2 - Handling multiple clients (sequentially)**: looping `accept()` to handle clients one after another, understanding the OS-level backlog queue and why a single blocking loop can't serve two clients at once.
+- **Phase 3 - Concurrency with threads**: `std::thread::spawn` + `move` closures, giving each client its own thread so one client can't block another.
+- **Phase 4 - Shared state across threads**: `Arc<Mutex<T>>` to safely share a registry of connected clients across threads, enabling actual message broadcasting between clients.
 - **Phase 5+ (planned)**: revisiting this same problem with `async`/`tokio` instead of OS threads, to compare the two concurrency models directly.
 
 ## Usage
