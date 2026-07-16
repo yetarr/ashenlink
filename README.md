@@ -10,7 +10,9 @@ This isn't meant to be a polished, ready-to-use chat app. It's a way to actually
 - **Phase 2 - Handling multiple clients (sequentially)**: looping `accept()` to handle clients one after another, understanding the OS-level backlog queue and why a single blocking loop can't serve two clients at once.
 - **Phase 3 - Concurrency with threads**: `std::thread::spawn` + `move` closures, giving each client its own thread so one client can't block another.
 - **Phase 4 - Shared state across threads**: `Arc<Mutex<T>>` to safely share a registry of connected clients across threads, enabling actual message broadcasting between clients.
-- **Phase 5+ (planned)**: revisiting this same problem with `async`/`tokio` instead of OS threads, to compare the two concurrency models directly.
+- **Phase 5 - Async with tokio**: rebuilding the same broadcast server on `tokio` instead of OS threads, `tokio::net::TcpListener`/`TcpStream`, `tokio::spawn`, `tokio::sync::Mutex`, and `OwnedReadHalf`/`OwnedWriteHalf` (via `into_split()`) in place of `try_clone()`. Same concurrency result as Phase 4, but on lightweight async tasks instead of OS threads, sets up the ecosystem (WebSockets, async DB access) needed for later phases.
+- **Phase 6 (planned) - WebSockets**: swapping raw TCP + newline-delimited text for a real WebSocket protocol (`tokio-tungstenite`), moving from manually parsed lines to proper framed messages. A prerequisite for eventually testing/connecting from a browser or GUI client instead of `nc`.
+- **Later phases (planned)** - persistence (SQLite via `sqlx`/`rusqlite`), channels/rooms instead of global broadcast, basic auth, and eventually a real client with its own window (likely `egui`).
 
 ## Usage
 
