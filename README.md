@@ -11,7 +11,7 @@ This isn't meant to be a polished, ready-to-use chat app. It's a way to actually
 - **Phase 3 - Concurrency with threads**: `std::thread::spawn` + `move` closures, giving each client its own thread so one client can't block another.
 - **Phase 4 - Shared state across threads**: `Arc<Mutex<T>>` to safely share a registry of connected clients across threads, enabling actual message broadcasting between clients.
 - **Phase 5 - Async with tokio**: rebuilding the same broadcast server on `tokio` instead of OS threads, `tokio::net::TcpListener`/`TcpStream`, `tokio::spawn`, `tokio::sync::Mutex`, and `OwnedReadHalf`/`OwnedWriteHalf` (via `into_split()`) in place of `try_clone()`. Same concurrency result as Phase 4, but on lightweight async tasks instead of OS threads, sets up the ecosystem (WebSockets, async DB access) needed for later phases.
-- **Phase 6 (planned) - WebSockets**: swapping raw TCP + newline-delimited text for a real WebSocket protocol (`tokio-tungstenite`), moving from manually parsed lines to proper framed messages. A prerequisite for eventually testing/connecting from a browser or GUI client instead of `nc`.
+- **Phase 6 - WebSockets**: swapped raw TCP + newline-delimited text for a real WebSocket protocol (`tokio-tungstenite` + `futures-util`). `accept_async` handles the handshake, streams split into a `SplitSink`/`SplitStream` pair instead of raw read/write halves, and messages arrive as framed `Message` values instead of manually parsed lines. Introduced a small `Signal` enum in `client.rs` to translate WebSocket-specific message types into the server's own vocabulary (`Message`/`Stop`), and disconnects are now handled explicitly via `Close` frames or read errors rather than a `read_line` returning 0 bytes. `nc` no longer works for testing, use `websocat ws://127.0.0.1:8080` instead.
 - **Later phases (planned)** - persistence (SQLite via `sqlx`/`rusqlite`), channels/rooms instead of global broadcast, basic auth, and eventually a real client with its own window (likely `egui`).
 
 ## Usage
@@ -20,10 +20,10 @@ This isn't meant to be a polished, ready-to-use chat app. It's a way to actually
 cargo run
 ```
 
-Connect with `nc` (or any raw TCP client):
+As of Phase 6, the server speaks WebSockets, not raw TCP, connect with `websocat`:
 
 ```bash
-nc 127.0.0.1 8080
+websocat ws://127.0.0.1:8080
 ```
 
 Messages sent by one connected client are broadcast to all other connected clients. Join/leave events are announced to everyone.
