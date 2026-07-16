@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
-use tokio::net::tcp::OwnedWriteHalf;
-use tokio::io::AsyncWriteExt;
+use futures_util::SinkExt;
+use tokio::net::TcpStream;
+use futures_util::stream::SplitSink;
+use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::WebSocketStream;
 
 pub struct FireKeeper {
-    streams: HashMap<usize, OwnedWriteHalf>,
+    streams: HashMap<usize, SplitSink<WebSocketStream<TcpStream>, Message>>,
     next_id: usize,
 }
 
@@ -16,7 +19,7 @@ impl FireKeeper {
         }
     }
 
-    pub async fn recognize(&mut self, stream: OwnedWriteHalf) -> usize {
+    pub async fn recognize(&mut self, stream: SplitSink<WebSocketStream<TcpStream>, Message>) -> usize {
         let id = self.next_id;
         self.next_id += 1;
 
@@ -34,7 +37,7 @@ impl FireKeeper {
     async fn warn(&mut self, content: &str) {
         for (_, stream) in &mut self.streams {
             let msg = format!("Keeper: {}\n", content);
-            stream.write_all(msg.as_bytes()).await.unwrap();
+            stream.send(Message::Text(msg.into())).await.unwrap();
         }
 
         println!("Keeper: {}", content);
@@ -46,8 +49,8 @@ impl FireKeeper {
                 continue;
             }
 
-            let msg = format!("{}: {}\n", from, content.trim_end());
-            kp.1.write_all(msg.as_bytes()).await.unwrap();
+            let msg = format!("{}: {}", from, content);
+            kp.1.send(Message::Text(msg.into())).await.unwrap();
         }
     }
 }
