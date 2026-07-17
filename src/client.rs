@@ -5,7 +5,31 @@ use futures_util::stream::SplitStream;
 use tokio::{net::TcpStream, sync::Mutex};
 use tokio_tungstenite::{WebSocketStream, accept_async, tungstenite::{self, Utf8Bytes}};
 
-use crate::keeper::FireKeeper;
+use crate::{keeper::FireKeeper, message::ShrineMessage};
+
+pub struct ShrineClient {
+    pub id: usize,
+    pub name: String,
+    pub stream: SplitStream<WebSocketStream<TcpStream>>,
+}
+
+impl ShrineClient {
+    pub fn new(id: usize, stream: SplitStream<WebSocketStream<TcpStream>>) -> Self {
+        ShrineClient {
+            id,
+            stream,
+            name: String::new()
+        }
+    }
+
+    pub fn has_name(&self) -> bool {
+        !self.name.is_empty()
+    }
+
+    pub fn name(&self) -> String {
+        if self.has_name() { self.name.clone() } else { format!("{}{}", "Anonymous", self.id) }
+    }
+}
 
 enum Signal {
     Message(Utf8Bytes),
@@ -14,17 +38,17 @@ enum Signal {
 
 pub async fn handle_client(stream: TcpStream, keeper: Arc<Mutex<FireKeeper>>) {
     let ws_stream = accept_async(stream).await.unwrap();
-    let (write, mut read) = ws_stream.split();
-    let id = keeper.lock().await.recognize(write).await;
+    let mut client = keeper.lock().await.recognize(ws_stream).await;
     loop {
-        let response = read_msg(&mut read).await;
+        let response = read_msg(&mut client.stream).await;
         match response {
-            Some(Signal::Message(msg)) => { 
-                println!("{}: {}", id, msg.trim_end());
-                keeper.lock().await.broadcast(&msg, id).await;
+            Some(Signal::Message(msg)) => {
+                let msg = ShrineMessage::new(&msg, &client);
+                println!("{}", &msg);
+                keeper.lock().await.broadcast(&msg).await;
             },
             Some(Signal::Stop) => {
-                keeper.lock().await.forget(id).await;
+                keeper.lock().await.forget(&client).await;
                 break;
             },
             _ => {},
