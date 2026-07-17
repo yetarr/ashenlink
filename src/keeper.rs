@@ -27,31 +27,42 @@ impl FireKeeper {
         }
     }
 
-    pub async fn recognize(&mut self, stream: WebSocketStream<TcpStream>) -> ShrineClient {
-        let (write, read) = stream.split();
+    pub async fn recognize(&mut self, stream: WebSocketStream<TcpStream>) -> Result<ShrineClient> {
+        let (mut write, read) = stream.split();
 
         let id = self.next_id;
         self.next_id += 1;
+
+        self.inform_context(&mut write).await?;
         self.streams.insert(id, write);
 
         let client = ShrineClient::new(id, read);
-        self.warn(&format!("{} entered the shrine!", client.name()))
-            .await;
-        client
+        self.warn(&format!("{} entered the shrine!", client.name())).await;
+        Ok(client)
     }
 
-    pub async fn forget(&mut self, client: &ShrineClient) {
+    pub async fn inform_context(&self, write: &mut SplitSink<WebSocketStream<TcpStream>, Message>,) -> Result<()> {
+        let mut history = db::recent_messages(&self.pool, 20).await?;
+        history.reverse();
+        for (sender, content) in history {
+            write.send(Message::Text(format!("[context] {}: {}", sender, content).into())).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn forget(&mut self, client: &ShrineClient) -> Result<()> {
         self.streams.remove(&client.id);
-        self.warn(&format!("{} left the shrine!", client.name()))
-            .await;
+        self.warn(&format!("{} left the shrine!", client.name())).await;
+        Ok(())
     }
 
     async fn warn(&mut self, content: &str) {
         for (_, stream) in &mut self.streams {
             let msg = format!("Keeper: {}\n", content);
-            stream.send(Message::Text(msg.into())).await.unwrap();
+            if let Err(e) = stream.send(Message::Text(msg.into())).await {
+                eprintln!("warn error: {:?}", e);
+            }
         }
-
         println!("Keeper: {}", content);
     }
 
@@ -60,10 +71,8 @@ impl FireKeeper {
             if msg.sender_id == *kp.0 {
                 continue;
             }
-
             kp.1.send(Message::Text(msg.into())).await?;
         }
-
         db::save_message(&self.pool, &msg.sender_name, &msg.content).await?;
         Ok(())
     }

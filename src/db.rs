@@ -33,3 +33,14 @@ pub async fn save_message(pool: &SqlitePool, sender_name: &str, content: &str) -
 
     Ok(())
 }
+
+pub async fn recent_messages(pool: &SqlitePool, limit: i64) -> Result<Vec<(String, String)>> {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT sender_name, content FROM messages ORDER BY id DESC LIMIT ?"
+    )
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows)
+}

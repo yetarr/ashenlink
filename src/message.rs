@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{fmt::Display, time::{SystemTime, UNIX_EPOCH},};
 
 use anyhow::Result;
 use tokio_tungstenite::tungstenite::Utf8Bytes;

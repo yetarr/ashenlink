@@ -46,7 +46,7 @@ enum Signal {
 
 pub async fn handle_client(stream: TcpStream, keeper: Arc<Mutex<FireKeeper>>) -> Result<()> {
     let ws_stream = accept_async(stream).await?;
-    let mut client = keeper.lock().await.recognize(ws_stream).await;
+    let mut client = keeper.lock().await.recognize(ws_stream).await?;
     loop {
         let response = read_msg(&mut client.stream).await;
         match response {
@@ -56,13 +56,12 @@ pub async fn handle_client(stream: TcpStream, keeper: Arc<Mutex<FireKeeper>>) ->
                 keeper.lock().await.broadcast(&msg).await?;
             }
             Some(Signal::Stop) => {
-                keeper.lock().await.forget(&client).await;
+                keeper.lock().await.forget(&client).await?;
                 break;
             }
             _ => {}
         }
     }
-
     Ok(())
 }
 
