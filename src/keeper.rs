@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use anyhow::Result;
+use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use sqlx::SqlitePool;
 use tokio::net::TcpStream;
-use futures_util::stream::SplitSink;
-use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::Message;
 
 use crate::client::ShrineClient;
 use crate::db;
@@ -28,19 +29,21 @@ impl FireKeeper {
 
     pub async fn recognize(&mut self, stream: WebSocketStream<TcpStream>) -> ShrineClient {
         let (write, read) = stream.split();
-    
+
         let id = self.next_id;
         self.next_id += 1;
         self.streams.insert(id, write);
-        
+
         let client = ShrineClient::new(id, read);
-        self.warn(&format!("{} entered the shrine!", client.name())).await;
+        self.warn(&format!("{} entered the shrine!", client.name()))
+            .await;
         client
     }
 
     pub async fn forget(&mut self, client: &ShrineClient) {
         self.streams.remove(&client.id);
-        self.warn(&format!("{} left the shrine!", client.name())).await;
+        self.warn(&format!("{} left the shrine!", client.name()))
+            .await;
     }
 
     async fn warn(&mut self, content: &str) {
@@ -52,15 +55,16 @@ impl FireKeeper {
         println!("Keeper: {}", content);
     }
 
-    pub async fn broadcast(&mut self, msg: &ShrineMessage) {
+    pub async fn broadcast(&mut self, msg: &ShrineMessage) -> Result<()> {
         for kp in &mut self.streams {
             if msg.sender_id == *kp.0 {
                 continue;
             }
 
-            kp.1.send(Message::Text(msg.into())).await.unwrap();
+            kp.1.send(Message::Text(msg.into())).await?;
         }
 
-        db::save_message(&self.pool, &msg.sender_name, &msg.content).await;
+        db::save_message(&self.pool, &msg.sender_name, &msg.content).await?;
+        Ok(())
     }
 }
